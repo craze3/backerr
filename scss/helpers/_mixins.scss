@@ -1,0 +1,141 @@
+/*=== Media Query ===*/
+
+@mixin brk-point($mw) {
+    @media(min-width: $mw) {
+        @content;
+    }
+}
+@mixin mobile-xs {
+    @media(min-width: 320px) {
+        @content;
+    }
+}
+
+@mixin mobile {
+    @media(min-width: 480px) {
+        @content;
+    }
+}
+
+@mixin mobile-lg {
+    @media(min-width: 576px) {
+        @content;
+    }
+}
+
+@mixin tablet {
+    @media(min-width: 768px) {
+        @content;
+    }
+}
+
+@mixin desktops {
+    @media(min-width: 992px) {
+        @content;
+    }
+}
+
+@mixin large-desktops {
+    @media(min-width: 1200px) {
+        @content;
+    }
+}
+
+@mixin large-desktops-mid {
+    @media(min-width: 1366px) {
+        @content;
+    }
+}
+
+@mixin extra-large-desktops {
+    @media(min-width: 1600px) {
+        @content;
+    }
+}
+
+%smallCard{
+   display: flex;
+   align-items: center;
+   .image{
+       border-radius: 50%;
+       width: 43px;
+       height: 43px;
+       overflow: hidden;
+       img{
+           width: 100%;
+       }
+   }
+   .content{
+       padding-left: 20px;
+       padding-top: 5px;
+       h5{
+        color: #000000;
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1;
+       }
+       span{
+            color: #666666;
+            font-size: 14px;
+            font-weight: 400;
+            letter-spacing: -0.6px;
+            line-height: 1;
+       }
+   }
+}
+%bgOverlay{
+    position: relative;
+    z-index: 1;
+    &:before{
+        background: #000000;
+        content: '';
+        opacity: .57;
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 100%;
+        z-index: -1;
+    }
+}
+@mixin section-padding{
+    padding-top: 130px;
+    padding-bottom: 130px;
+}
+
+@mixin section-title {
+    h2{
+        font-size: 38px;
+        font-weight: 600;
+        letter-spacing: -2px;
+        line-height: 48px;
+        margin-bottom: 20px;
+    }
+    p{
+        width: 697px;
+        height: 64px;
+        color: #666666;
+        font-family: Inter;
+        font-size: 18px;
+        font-weight: 400;
+        line-height: 32px;
+    }
+}
+@mixin section-title-2 {
+    h2{
+        font-size: 52px;
+        font-weight: 600;
+        letter-spacing: -2px;
+        line-height: 60px;
+        margin-bottom: 20px;
+    }
+    p{
+        width: 697px;
+        height: 64px;
+        color: #666666;
+        font-family: Inter;
+        font-size: 18px;
+        font-weight: 400;
+        line-height: 32px;
+    }
+}
