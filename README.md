@@ -1,5 +1,6 @@
 # backerr
 The decentralized alternative to Patreon.
+Launching December 1st!
 
 Built with: Ethereum, Chainlink, Web3, & IPFS!
 

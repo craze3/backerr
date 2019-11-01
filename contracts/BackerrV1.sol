@@ -11,11 +11,8 @@ import "https://github.com/smartcontractkit/chainlink/blob/develop/evm/contracts
 import "https://github.com/smartcontractkit/chainlink/blob/develop/evm/contracts/vendor/Ownable.sol";
 import "https://github.com/smartcontractkit/chainlink/blob/develop/evm/contracts/vendor/SafeMath.sol";
 
-contract BackerrV1 is ChainlinkClient, Ownable {
-  uint256 constant private ORACLE_PAYMENT = 1 * LINK; // solium-disable-line zeppelin/no-arithmetic-operations
-
-  mapping(bytes32 => uint256) internal prices;
-  mapping(bytes32 => bytes32) internal receipts;
+contract BackerrV1 {
+  using SafeMath for uint256;
 
   // List of existing projects
   Project[] private projects;
@@ -33,17 +30,141 @@ contract BackerrV1 is ChainlinkClient, Ownable {
         uint256 goalAmount
    );
 
-  // link: 0x0000000000000000000000000000000000000000
-  constructor(address _link) public {
-    // Set the address for the LINK token for the network.
-    if(_link == address(0)) {
-      // Useful for deploying to public networks.
-      setPublicChainlinkToken();
-    } else {
-      // Useful if you're deploying to a local network.
-      setChainlinkToken(_link);
+
+  /** @dev Function to get a specific project
+  * @return A single project struct
+    */
+    function getProject(string memory urlString) public view returns  (address projectStarter,
+        string memory projectTitle,
+        string memory projectDesc,
+        address projectContract,
+        uint256 created,
+        uint256 deadline,
+        uint256 currentAmount,
+        uint256 goalAmount,
+        uint256 state) {
+        return projectsByURL[urlString].getDetailsWithoutState();
     }
-  }
+
+    /** @dev Function to get a specific project
+      * @return A single project struct
+    */
+    function getProjectCreator(string memory urlString) public view returns (address) {
+        return address(projectsByURL[urlString].creator);
+    }
+
+    /** @dev Function to start a new project.
+      * @param title Title of the project to be created
+      * @param description Brief description about the project
+      * @param durationInDays Project deadline in days
+      * @param amountToRaise Project goal in wei
+      */
+    function startProject(
+        string title,
+        string description,
+        string urlString,
+        uint durationInDays,
+        uint amountToRaise
+    ) external {
+        require(getProjectCreator(urlString) == address(0), "Duplicate key"); // duplicate key
+        uint raiseUntil = now.add(durationInDays.mul(1 days));
+        Project newProject = new Project(msg.sender, title, description, urlString, raiseUntil, amountToRaise, address(0));
+        projects.push(newProject);
+        projectsByURL[urlString] = newProject;
+        emit ProjectStarted(
+            address(newProject),
+            msg.sender,
+            title,
+            description,
+            urlString,
+            raiseUntil,
+            amountToRaise
+        );
+    }
+
+    /** @dev Function to get all projects' contract addresses.
+      * @return A list of all projects' contract addreses
+      */
+    function returnAllProjects() external view returns(Project[] memory){
+        return projects;
+    }
+
+}
+
+contract Project is ChainlinkClient, Ownable{
+    using SafeMath for uint256;
+
+    uint256 constant private ORACLE_PAYMENT = 1 * LINK; // solium-disable-line zeppelin/no-arithmetic-operations
+
+    mapping(bytes32 => uint256) internal prices;
+    mapping(bytes32 => bytes32) internal receipts;
+
+    // Data structures
+    enum State {
+        Fundraising,
+        Expired,
+        Successful
+    }
+
+    // State variables
+    address public creator;
+    uint public amountGoal; // required to reach at least this much, else everyone gets refund
+    uint public completeAt;
+    uint256 public currentBalance;
+    uint public raiseBy;
+    string public title;
+    string public description;
+    string public urlString;
+    State public state = State.Fundraising; // initialize on create
+    mapping (address => uint) public contributions;
+    mapping (address => uint) public subscriptionCosts;
+
+    // Event that will be emitted whenever funding will be received
+    event FundingReceived(address contributor, uint amount, uint currentTotal);
+    // Event that will be emitted whenever the project starter has received the funds
+    event CreatorPaid(address recipient);
+
+    // Modifier to check current state
+    modifier inState(State _state) {
+        require(state == _state);
+        _;
+    }
+
+    // Modifier to check if the function caller is the project creator
+    modifier isCreator() {
+        require(msg.sender == creator);
+        _;
+    }
+
+    // link: 0x0000000000000000000000000000000000000000
+    constructor
+    (
+        address projectStarter,
+        string memory projectTitle,
+        string memory projectDesc,
+        string memory projectUrl,
+        uint fundRaisingDeadline,
+        uint goalAmount,
+        address _link
+    ) public {
+        creator = projectStarter;
+        title = projectTitle;
+        description = projectDesc;
+        urlString = projectUrl;
+        amountGoal = goalAmount;
+        raiseBy = fundRaisingDeadline;
+        currentBalance = 0;
+
+        // Set the address for the LINK token for the network.
+        if(_link == address(0)) {
+          // Useful for deploying to public networks.
+          setPublicChainlinkToken();
+        } else {
+          // Useful if you're deploying to a local network.
+          setChainlinkToken(_link);
+        }
+    }
+
 
   // oracle: "0xc99B3D447826532722E41bc36e644ba3479E4365"
   // jobId: "3cff0a3524694ff8834bda9cf9c779a1"
@@ -92,123 +213,6 @@ contract BackerrV1 is ChainlinkClient, Ownable {
     }
   }
 
-      /** @dev Function to get a specific project
-      * @return A single project struct
-    */
-    function getProject(string memory urlString) public view returns  (address projectStarter,
-        string memory projectTitle,
-        string memory projectDesc,
-        address projectContract,
-        uint256 created,
-        uint256 deadline,
-        uint256 currentAmount,
-        uint256 goalAmount,
-        uint256 state) {
-        return projectsByURL[urlString].getDetailsWithoutState();
-    }
-
-    /** @dev Function to get a specific project
-      * @return A single project struct
-    */
-    function getProjectCreator(string memory urlString) public view returns (address) {
-        return address(projectsByURL[urlString].creator);
-    }
-
-    /** @dev Function to start a new project.
-      * @param title Title of the project to be created
-      * @param description Brief description about the project
-      * @param durationInDays Project deadline in days
-      * @param amountToRaise Project goal in wei
-      */
-    function startProject(
-        string title,
-        string description,
-        string urlString,
-        uint durationInDays,
-        uint amountToRaise
-    ) external {
-        require(getProjectCreator(urlString) == address(0), "Duplicate key"); // duplicate key
-        uint raiseUntil = now.add(durationInDays.mul(1 days));
-        Project newProject = new Project(msg.sender, title, description, urlString, raiseUntil, amountToRaise);
-        projects.push(newProject);
-        projectsByURL[urlString] = newProject;
-        emit ProjectStarted(
-            address(newProject),
-            msg.sender,
-            title,
-            description,
-            urlString,
-            raiseUntil,
-            amountToRaise
-        );
-    }
-
-    /** @dev Function to get all projects' contract addresses.
-      * @return A list of all projects' contract addreses
-      */
-    function returnAllProjects() external view returns(Project[] memory){
-        return projects;
-    }
-
-}
-
-contract Project {
-    using SafeMath for uint256;
-
-    // Data structures
-    enum State {
-        Fundraising,
-        Expired,
-        Successful
-    }
-
-    // State variables
-    address public creator;
-    uint public amountGoal; // required to reach at least this much, else everyone gets refund
-    uint public completeAt;
-    uint256 public currentBalance;
-    uint public raiseBy;
-    string public title;
-    string public description;
-    string public urlString;
-    State public state = State.Fundraising; // initialize on create
-    mapping (address => uint) public contributions;
-
-    // Event that will be emitted whenever funding will be received
-    event FundingReceived(address contributor, uint amount, uint currentTotal);
-    // Event that will be emitted whenever the project starter has received the funds
-    event CreatorPaid(address recipient);
-
-    // Modifier to check current state
-    modifier inState(State _state) {
-        require(state == _state);
-        _;
-    }
-
-    // Modifier to check if the function caller is the project creator
-    modifier isCreator() {
-        require(msg.sender == creator);
-        _;
-    }
-
-    constructor
-    (
-        address projectStarter,
-        string memory projectTitle,
-        string memory projectDesc,
-        string memory projectUrl,
-        uint fundRaisingDeadline,
-        uint goalAmount
-    ) public {
-        creator = projectStarter;
-        title = projectTitle;
-        description = projectDesc;
-        urlString = projectUrl;
-        amountGoal = goalAmount;
-        raiseBy = fundRaisingDeadline;
-        currentBalance = 0;
-    }
-
     /** @dev Function to fund a certain project.
       */
     function contribute() external inState(State.Fundraising) payable {
@@ -224,7 +228,7 @@ contract Project {
     function checkIfFundingCompleteOrExpired() public {
         if (currentBalance >= amountGoal) {
             state = State.Successful;
-            payOut();
+            //payOut();
         } else if (now > raiseBy)  {
             state = State.Expired;
         }
@@ -243,6 +247,35 @@ contract Project {
         } else {
             currentBalance = totalRaised;
             state = State.Successful;
+        }
+
+        return false;
+    }
+
+    /** @dev Function for project starter to withdraw USD equivlaent of ETH
+      */
+    function withdrawSubscription(address subscriber) public isCreator returns (bool) {
+        require(currentBalance > 0);
+        require(contributions[subscriber] > 0);
+
+        // Get subscription contract amount in USD:
+        uint usd_cost = subscriptionCosts[subscriber];
+
+        // Get conversion rate from Chainlink:
+
+
+
+        uint256 totalRaised = currentBalance;
+        currentBalance = 0;
+        //  set contributions[subscriber] = 0 ?
+
+        if (creator.send(totalRaised)) {
+            emit CreatorPaid(creator);
+            return true;
+        } else {
+            currentBalance = totalRaised;
+            //state = State.Successful;
+            //  Reset contributions[subscriber] ?
         }
 
         return false;
