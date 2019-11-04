@@ -91,7 +91,7 @@ contract BackerrV1 {
 
 }
 
-contract Project is ChainlinkClient, Ownable{
+contract Project is ChainlinkClient, Ownable {
     using SafeMath for uint256;
 
     uint256 constant private ORACLE_PAYMENT = 1 * LINK; // solium-disable-line zeppelin/no-arithmetic-operations
@@ -146,7 +146,7 @@ contract Project is ChainlinkClient, Ownable{
         uint fundRaisingDeadline,
         uint goalAmount,
         address _link
-    ) public {
+    ) public payable {
         creator = projectStarter;
         title = projectTitle;
         description = projectDesc;
@@ -171,7 +171,7 @@ contract Project is ChainlinkClient, Ownable{
   // uniqueId: 0x7465737400000000000000000000000000000000000000000000000000000000
   function requestEthereumPrice(address _oracle, string _jobId, bytes32 _uniqueId)
     public
-    onlyOwner
+    isCreator
   {
     Chainlink.Request memory req = buildChainlinkRequest(stringToBytes32(_jobId), this, this.fulfillEthereumPrice.selector);
     req.add("url", "https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD");
@@ -197,7 +197,7 @@ contract Project is ChainlinkClient, Ownable{
     return chainlinkTokenAddress();
   }
 
-  function withdrawLink() public onlyOwner {
+  function withdrawLink() public isCreator {
     LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
     require(link.transfer(msg.sender, link.balanceOf(address(this))), "Unable to transfer");
   }
@@ -324,4 +324,7 @@ contract Project is ChainlinkClient, Ownable{
         goalAmount = amountGoal;
         stated = uint(state);
     }
+
+    function() public payable { }
+
 }
